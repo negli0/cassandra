@@ -20,40 +20,182 @@ package org.apache.cassandra.tools.nodetool.stats;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
+import org.apache.cassandra.io.util.FileUtils;
+import org.apache.cassandra.net.MessagingServiceMBean;
+import org.apache.cassandra.streaming.ProgressInfo;
+import org.apache.cassandra.streaming.SessionInfo;
+import org.apache.cassandra.streaming.StreamState;
 import org.apache.cassandra.tools.NodeProbe;
 
 public class NetStatsHolder implements StatsHolder
 {
     public final NodeProbe probe;
+    public final boolean humanReadable;
 
-    public NetStatsHolder(NodeProbe probe)
+    public NetStatsHolder(NodeProbe probe, boolean humanReadable)
     {
         this.probe = probe;
+        this.humanReadable = humanReadable;
     }
 
     @Override
     public Map<String, Object> convert2Map()
     {
         HashMap<String, Object> result = new HashMap<>();
-        HashMap<String, Map<String, Object>> threadPools = new HashMap<>();
-        HashMap<String, Object> droppedMessage = new HashMap<>();
+        HashMap<String, Map<String, Object>> messageServices = new HashMap<>();
+        HashMap<String, Object> Statuses = new HashMap<>();
+        HashMap<String, Object> connecting = new HashMap<>();
+        HashMap<String, Object> receivingSummaries = new HashMap<>();
+        HashMap<String, Object> sendingSummaries = new HashMap<>();
+        HashMap<String, Object> sessionInfo = new HashMap<>();
+        HashMap<String, Object> streamStatuses = new HashMap<>();
 
-        for (Map.Entry<String, String> tp : probe.getThreadPools().entries())
+        result.put("Mode", probe.getOperationMode());
+
+        Set<StreamState> statuses = probe.getStreamStatus();
+        if (statuses.isEmpty())
         {
-            HashMap<String, Object> threadPool = new HashMap<>();
-            threadPool.put("ActiveTasks", probe.getThreadPoolMetric(tp.getKey(), tp.getValue(), "ActiveTasks"));
-            threadPool.put("PendingTasks", probe.getThreadPoolMetric(tp.getKey(), tp.getValue(), "PendingTasks"));
-            threadPool.put("CompletedTasks", probe.getThreadPoolMetric(tp.getKey(), tp.getValue(), "CompletedTasks"));
-            threadPool.put("CurrentlyBlockedTasks", probe.getThreadPoolMetric(tp.getKey(), tp.getValue(), "CurrentlyBlockedTasks"));
-            threadPool.put("TotalBlockedTasks", probe.getThreadPoolMetric(tp.getKey(), tp.getValue(), "TotalBlockedTasks"));
-            threadPools.put(tp.getValue(), threadPool);
+            streamStatuses.put("Statuses", null);
         }
-        result.put("ThreadPools", threadPools);
+        else
+        {
+            for (StreamState status : statuses)
+            {
+                for (SessionInfo info : status.sessions)
+                {
+                    sessionInfo.put("Peer", info.peer.toString());
+                    // print private IP when it is used
+                    if (!info.peer.equals(info.connecting))
+                    {
+                        connecting.put("Using", info.connecting);
+                    }
+                    sessionInfo.put("Connecting", connecting);
 
-        for (Map.Entry<String, Integer> entry : probe.getDroppedMessages().entrySet())
-            droppedMessage.put(entry.getKey(), entry.getValue());
-        result.put("DroppedMessage", droppedMessage);
+                    System.out.printf("%n");
+                    if (!info.receivingSummaries.isEmpty())
+                    {
+                        if (humanReadable)
+                        {
+                            receivingSummaries.put("TotalFilesToReceive", info.getTotalFilesToReceive());
+                            receivingSummaries.put("TotalSizeToReceive", FileUtils.stringifyFileSize(info.getTotalSizeToReceive()));
+                            receivingSummaries.put("TotalFilesReceived", info.getTotalFilesReceived());
+                            receivingSummaries.put("TotalSizeReceived", FileUtils.stringifyFileSize(info.getTotalSizeReceived()));
+
+                        }
+                        else
+                        {
+                            receivingSummaries.put("TotalFilesToReceive", info.getTotalFilesToReceive());
+                            receivingSummaries.put("TotalSizeToReceive", info.getTotalSizeToReceive());
+                            receivingSummaries.put("TotalFilesReceived", info.getTotalFilesReceived());
+                            receivingSummaries.put("TotalSizeReceived", info.getTotalSizeReceived());
+
+                        }
+
+                        for (ProgressInfo progress : info.getReceivingFiles())
+                        {
+                            receivingSummaries.put("Progress", progress.toString());
+                        }
+                    }
+                    sessionInfo.put("ReceivingSummaries", receivingSummaries);
+
+                    if (!info.sendingSummaries.isEmpty())
+                    {
+                        if (humanReadable)
+                        {
+                            sendingSummaries.put("TotalFilesToSend", info.getTotalFilesToSend());
+                            sendingSummaries.put("TotalFileSizeToSend", FileUtils.stringifyFileSize(info.getTotalSizeToSend()));
+                            sendingSummaries.put("TotalFilesSent", info.getTotalFilesSent());
+                            sendingSummaries.put("TotalFileSizeSent", FileUtils.stringifyFileSize(info.getTotalSizeSent()));
+                        }
+                        else
+                        {
+                            sendingSummaries.put("TotalFilesToSend", info.getTotalFilesToSend());
+                            sendingSummaries.put("TotalSizeToSend", info.getTotalSizeToSend());
+                            sendingSummaries.put("TotalFilesSent", info.getTotalFilesSent());
+                            sendingSummaries.put("TotalSizeSent", info.getTotalSizeSent());
+                        }
+
+                        Integer progressId = 0;
+                        HashMap<Object, Object> prog = new HashMap<>();
+                        for (ProgressInfo progress : info.getSendingFiles())
+                        {
+                            prog.put(progressId++, progress.toString());
+                        }
+                        sendingSummaries.put("Progress", prog);
+                    }
+                    sessionInfo.put("SendingSummaries", sendingSummaries);
+                }
+                Statuses.put("PlanID", status.planId);
+                Statuses.put("Description", status.description);
+                Statuses.put("SessionInfo", sessionInfo);
+            }
+            streamStatuses.put("Statuses", Statuses);
+        }
+        result.put("StreamStatuses", streamStatuses);
+
+        HashMap<String, Object> readRepairStatistics = new HashMap<>();
+        readRepairStatistics.put("Attempted", probe.getReadRepairAttempted());
+        readRepairStatistics.put("BlockingMismatch", probe.getReadRepairRepairedBlocking());
+        readRepairStatistics.put("BackgroundMismatch", probe.getReadRepairRepairedBackground());
+        result.put("ReadRepairStatistics", readRepairStatistics);
+
+
+        MessagingServiceMBean ms = probe.msProxy;
+        int pending;
+        long completed;
+        long dropped;
+
+        pending = 0;
+        for (int n : ms.getLargeMessagePendingTasks().values())
+            pending += n;
+        completed = 0;
+        for (long n : ms.getLargeMessageCompletedTasks().values())
+            completed += n;
+        dropped = 0;
+        for (long n : ms.getLargeMessageDroppedTasks().values())
+            dropped += n;
+        HashMap<String, Object> largeMessageService = new HashMap<>();
+        largeMessageService.put("Active", "n/a");
+        largeMessageService.put("Pending", pending);
+        largeMessageService.put("Completed", completed);
+        largeMessageService.put("Dropped", dropped);
+        messageServices.put("LargeMessages", largeMessageService);
+
+        pending = 0;
+        for (int n : ms.getSmallMessagePendingTasks().values())
+            pending += n;
+        completed = 0;
+        for (long n : ms.getSmallMessageCompletedTasks().values())
+            completed += n;
+        dropped = 0;
+        for (long n : ms.getSmallMessageDroppedTasks().values())
+            dropped += n;
+        HashMap<String, Object> smallMessageService = new HashMap<>();
+        smallMessageService.put("Active", "n/a");
+        smallMessageService.put("Pending", pending);
+        smallMessageService.put("Completed", completed);
+        smallMessageService.put("Dropped", dropped);
+        messageServices.put("SmallMessages", smallMessageService);
+
+        pending = 0;
+        for (int n : ms.getGossipMessagePendingTasks().values())
+            pending += n;
+        completed = 0;
+        for (long n : ms.getGossipMessageCompletedTasks().values())
+            completed += n;
+        dropped = 0;
+        for (long n : ms.getGossipMessageDroppedTasks().values())
+            dropped += n;
+        HashMap<String, Object> gossipMessageService = new HashMap<>();
+        gossipMessageService.put("Active", "n/a");
+        gossipMessageService.put("Pending", pending);
+        gossipMessageService.put("Completed", completed);
+        gossipMessageService.put("Dropped", dropped);
+        messageServices.put("GossipMessages", gossipMessageService);
+
+        result.put("MessageService", messageServices);
 
         return result;
     }
