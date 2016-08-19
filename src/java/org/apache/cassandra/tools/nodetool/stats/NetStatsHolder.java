@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.configuration.StrictConfigurationComparator;
+
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.net.MessagingServiceMBean;
 import org.apache.cassandra.streaming.ProgressInfo;
@@ -46,7 +48,7 @@ public class NetStatsHolder implements StatsHolder
         HashMap<String, Object> result = new HashMap<>();
         HashMap<String, Map<String, Object>> messageServices = new HashMap<>();
         HashMap<String, Object> Statuses = new HashMap<>();
-        HashMap<String, Object> connecting = new HashMap<>();
+        HashMap<String, String> connecting = new HashMap<>();
         HashMap<String, Object> receivingSummaries = new HashMap<>();
         HashMap<String, Object> sendingSummaries = new HashMap<>();
         HashMap<String, Object> sessionInfo = new HashMap<>();
@@ -69,11 +71,11 @@ public class NetStatsHolder implements StatsHolder
                     // print private IP when it is used
                     if (!info.peer.equals(info.connecting))
                     {
-                        connecting.put("Using", info.connecting);
+                        connecting.put("Using", info.connecting.toString());
                     }
                     sessionInfo.put("Connecting", connecting);
 
-                    System.out.printf("%n");
+//                    System.out.printf("%n");
                     if (!info.receivingSummaries.isEmpty())
                     {
                         if (humanReadable)
@@ -93,12 +95,17 @@ public class NetStatsHolder implements StatsHolder
 
                         }
 
-                        for (ProgressInfo progress : info.getReceivingFiles())
+                        Integer progressId = 0;
+                        HashMap<Object, Object> prog = new HashMap<>();
+                        for (ProgressInfo progress : info.getSendingFiles())
                         {
-                            receivingSummaries.put("Progress", progress.toString());
+                            prog.put(progressId++, progress.toString());
                         }
+                        sendingSummaries.put("Progress", prog);
+
+                        sessionInfo.put("ReceivingSummaries", receivingSummaries);
                     }
-                    sessionInfo.put("ReceivingSummaries", receivingSummaries);
+
 
                     if (!info.sendingSummaries.isEmpty())
                     {
@@ -124,8 +131,10 @@ public class NetStatsHolder implements StatsHolder
                             prog.put(progressId++, progress.toString());
                         }
                         sendingSummaries.put("Progress", prog);
+
+                        sessionInfo.put("SendingSummaries", sendingSummaries);
                     }
-                    sessionInfo.put("SendingSummaries", sendingSummaries);
+
                 }
                 Statuses.put("PlanID", status.planId);
                 Statuses.put("Description", status.description);
@@ -179,6 +188,7 @@ public class NetStatsHolder implements StatsHolder
         smallMessageService.put("Dropped", dropped);
         messageServices.put("SmallMessages", smallMessageService);
 
+
         pending = 0;
         for (int n : ms.getGossipMessagePendingTasks().values())
             pending += n;
@@ -194,6 +204,7 @@ public class NetStatsHolder implements StatsHolder
         gossipMessageService.put("Completed", completed);
         gossipMessageService.put("Dropped", dropped);
         messageServices.put("GossipMessages", gossipMessageService);
+
 
         result.put("MessageService", messageServices);
 

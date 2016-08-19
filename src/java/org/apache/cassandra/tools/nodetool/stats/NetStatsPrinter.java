@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.cassandra.cql3.CQL3Type;
+import org.apache.hadoop.mapred.join.OuterJoinRecordReader;
 
 public class NetStatsPrinter
 {
@@ -65,23 +66,34 @@ public class NetStatsPrinter
                 Map<Object, Object> session = status.get("SessionInfo") instanceof Map<?, ?> ? (Map) status.get("SessionInfo") : Collections.emptyMap();
                 out.printf("    %s", session.get("Peer").toString());
 
-                Map connecting = session.get("Connecting") instanceof Map<?, ?> ? (Map) session.get("Connecting") : Collections.emptyMap();
-                out.printf(" (using) %s", connecting.get("Using").toString());
+                Map<Object, Object> connecting = session.get("Connecting") instanceof Map<?, ?> ? (Map) session.get("Connecting") : Collections.emptyMap();
+                if (!connecting.isEmpty())
+                    out.printf(" (using) %s", connecting.get("Using"));
+//                out.printf(" (using) %s%n", session.get("Connecting").toString());
 
-                Map recvSum = session.get("ReceivingSummaries") instanceof Map<?, ?> ? (Map) session.get("ReceivingSummaries") : Collections.emptyMap();
-                out.printf("        Receiving %s files, %s total. Already received %s files, %s total%n", recvSum.get("TotalFilesToReceive"), recvSum.get("TotalSizeToReceive"), recvSum.get("TotalFilesReceived"), recvSum.get("TotalSizeReceived"));
-                Map<Object, Object> progMap = recvSum.get("Progress") instanceof Map<?, ?> ? (Map) recvSum.get("Progress") : Collections.emptyMap();
-                for (Map.Entry<Object, Object> prog : progMap.entrySet())
+                out.printf("%n");
+
+                Map<Object, Object> recvSum = session.get("ReceivingSummaries") instanceof Map<?, ?> ? (Map) session.get("ReceivingSummaries") : Collections.emptyMap();
+                if (!recvSum.isEmpty())
                 {
-                    out.printf("            %s%n", prog.getValue().toString());
+                    out.printf("        Receiving %s files, %s total. Already received %s files, %s total%n", recvSum.get("TotalFilesToReceive"), recvSum.get("TotalSizeToReceive"), recvSum.get("TotalFilesReceived"), recvSum.get("TotalSizeReceived"));
+                    Map<Object, Object> progMap = recvSum.get("Progress") instanceof Map<?, ?> ? (Map) recvSum.get("Progress") : Collections.emptyMap();
+                    for (Map.Entry<Object, Object> prog : progMap.entrySet())
+                    {
+                        out.printf("            %s%n", prog.getValue().toString());
+                    }
                 }
 
-                Map sendSum = session.get("ReceivingSummaries") instanceof Map<?, ?> ? (Map) session.get("ReceivingSummaries") : Collections.emptyMap();
-                out.printf("        Sending %s files, %s total. Already sent %s files, %s total%n", sendSum.get("TotalFilesToSend"), sendSum.get("TotalSizeToSend"), sendSum.get("TotalFilesSent"), sendSum.get("TotalSizeSent"));
-                progMap = sendSum.get("Progress") instanceof Map<?, ?> ? (Map) sendSum.get("Progress") : Collections.emptyMap();
-                for (Map.Entry<Object, Object> prog : progMap.entrySet())
+                Map<Object, Object> sendSum = session.get("ReceivingSummaries") instanceof Map<?, ?> ? (Map) session.get("ReceivingSummaries") : Collections.emptyMap();
+                if (!sendSum.isEmpty())
                 {
-                    out.printf("            %s%n", prog.getValue().toString());
+                    out.printf("        Sending %s files, %s total. Already sent %s files, %s total%n", sendSum.get("TotalFilesToSend"), sendSum.get("TotalSizeToSend"), sendSum.get("TotalFilesSent"), sendSum.get("TotalSizeSent"));
+                    Map<Object, Object> progMap = sendSum.get("Progress") instanceof Map<?, ?> ? (Map) sendSum.get("Progress") : Collections.emptyMap();
+//                    progMap = sendSum.get("Progress") instanceof Map<?, ?> ? (Map) sendSum.get("Progress") : Collections.emptyMap();
+                    for (Map.Entry<Object, Object> prog : progMap.entrySet())
+                    {
+                        out.printf("            %s%n", prog.getValue().toString());
+                    }
                 }
             }
 
