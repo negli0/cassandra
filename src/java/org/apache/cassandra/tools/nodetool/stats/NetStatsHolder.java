@@ -18,10 +18,9 @@
 
 package org.apache.cassandra.tools.nodetool.stats;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
+import java.util.LinkedHashMap;
 import org.apache.commons.configuration.StrictConfigurationComparator;
 
 import org.apache.cassandra.io.util.FileUtils;
@@ -36,6 +35,39 @@ public class NetStatsHolder implements StatsHolder
     public final NodeProbe probe;
     public final boolean humanReadable;
 
+    public static final String MODE = "Mode";
+    public static final String STREAM_STATUSES = "StreamStatuses";
+    public static final String READ_REPAIR_STATICTICS = "ReadRepairStatictics";
+    public static final String MESSAGE_SERVICES = "MessageServices";
+    public static final String STATUSES = "Statuses";
+    public static final String PLAN_ID = "PlanID";
+    public static final String DESCRIPTION = "Description";
+    public static final String SESSION_INFO = "SessionInfo";
+    public static final String PEER = "Peer";
+    public static final String CONNECTING = "Connecting";
+    public static final String RECEIVING_SUMMARIES = "ReceivingSummaries";
+    public static final String SENDING_SUMMARIES = "SendingSummaries";
+    public static final String USING = "Using";
+    public static final String TOTAL_FILES_TO_RECEIVE = "TotalFilesToReceive";
+    public static final String TOTAL_SIZE_TO_RECEIVE = "TotalSizeToReceive";
+    public static final String TOTAL_FILES_RECEIVED = "TotalFilesReceived";
+    public static final String TOTAL_SIZE_RECEIVED = "TotalSizeReceived";
+    public static final String TOTAL_FILES_TO_SEND = "TotalFilesToSend";
+    public static final String TOTAL_SIZE_TO_SEND = "TotalSizeToSend";
+    public static final String TOTAL_FILES_SENT = "TotalFilesSent";
+    public static final String TOTAL_SIZE_SENT = "TotalSizeSent";
+    public static final String PROGRESS = "Progress";
+    public static final String ATTEMPTED = "Attempted";
+    public static final String BLOCKING_MISMATCH = "BlockingMismatch";
+    public static final String BACKGROUND_MISMATCH = "BackgroundMismatch";
+    public static final String LARGE_MESSAGES = "LargeMessages";
+    public static final String SMALL_MESSAGES = "SmallMessages";
+    public static final String GOSSIP_MESSAGES = "GossipMessages";
+    public static final String ACTIVE = "Active";
+    public static final String PENDING = "Pending";
+    public static final String COMPLETED = "Completed";
+    public static final String DROPPED = "DROPPED";
+
     public NetStatsHolder(NodeProbe probe, boolean humanReadable)
     {
         this.probe = probe;
@@ -45,65 +77,58 @@ public class NetStatsHolder implements StatsHolder
     @Override
     public Map<String, Object> convert2Map()
     {
-        HashMap<String, Object> result = new HashMap<>();
-        HashMap<String, Map<String, Object>> messageServices = new HashMap<>();
-        HashMap<String, Object> Statuses = new HashMap<>();
-        HashMap<String, String> connecting = new HashMap<>();
-        HashMap<String, Object> receivingSummaries = new HashMap<>();
-        HashMap<String, Object> sendingSummaries = new HashMap<>();
-        HashMap<String, Object> sessionInfo = new HashMap<>();
-        HashMap<String, Object> streamStatuses = new HashMap<>();
+        Map<String, Object> result = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> messageServices = new LinkedHashMap<>();
+        Map<String, Object> Statuses = new LinkedHashMap<>();
+        Map<String, String> connecting = new LinkedHashMap<>();
+        Map<String, Object> receivingSummaries = new LinkedHashMap<>();
+        Map<String, Object> sendingSummaries = new LinkedHashMap<>();
+        Map<String, Object> sessionInfo = new LinkedHashMap<>();
+        Map<String, Object> streamStatuses = new LinkedHashMap<>();
 
-        result.put("Mode", probe.getOperationMode());
+        result.put(NetStatsHolder.MODE, probe.getOperationMode());
 
         Set<StreamState> statuses = probe.getStreamStatus();
         if (statuses.isEmpty())
-        {
-            streamStatuses.put("Statuses", null);
-        }
+            streamStatuses.put(NetStatsHolder.STATUSES, null);
         else
         {
             for (StreamState status : statuses)
             {
                 for (SessionInfo info : status.sessions)
                 {
-                    sessionInfo.put("Peer", info.peer.toString());
+                    sessionInfo.put(NetStatsHolder.PEER, info.peer.toString());
                     // print private IP when it is used
                     if (!info.peer.equals(info.connecting))
-                    {
-                        connecting.put("Using", info.connecting.toString());
-                    }
-                    sessionInfo.put("Connecting", connecting);
+                        connecting.put(NetStatsHolder.USING, info.connecting.toString());
 
-//                    System.out.printf("%n");
+                    sessionInfo.put(NetStatsHolder.CONNECTING, connecting);
+
                     if (!info.receivingSummaries.isEmpty())
                     {
                         if (humanReadable)
                         {
-                            receivingSummaries.put("TotalFilesToReceive", info.getTotalFilesToReceive());
-                            receivingSummaries.put("TotalSizeToReceive", FileUtils.stringifyFileSize(info.getTotalSizeToReceive()));
-                            receivingSummaries.put("TotalFilesReceived", info.getTotalFilesReceived());
-                            receivingSummaries.put("TotalSizeReceived", FileUtils.stringifyFileSize(info.getTotalSizeReceived()));
-
+                            receivingSummaries.put(NetStatsHolder.TOTAL_FILES_TO_RECEIVE, info.getTotalFilesToReceive());
+                            receivingSummaries.put(NetStatsHolder.TOTAL_SIZE_TO_RECEIVE, FileUtils.stringifyFileSize(info.getTotalSizeToReceive()));
+                            receivingSummaries.put(NetStatsHolder.TOTAL_FILES_RECEIVED, info.getTotalFilesReceived());
+                            receivingSummaries.put(NetStatsHolder.TOTAL_SIZE_RECEIVED, FileUtils.stringifyFileSize(info.getTotalSizeReceived()));
                         }
                         else
                         {
-                            receivingSummaries.put("TotalFilesToReceive", info.getTotalFilesToReceive());
-                            receivingSummaries.put("TotalSizeToReceive", info.getTotalSizeToReceive());
-                            receivingSummaries.put("TotalFilesReceived", info.getTotalFilesReceived());
-                            receivingSummaries.put("TotalSizeReceived", info.getTotalSizeReceived());
-
+                            receivingSummaries.put(NetStatsHolder.TOTAL_FILES_TO_RECEIVE, info.getTotalFilesToReceive());
+                            receivingSummaries.put(NetStatsHolder.TOTAL_SIZE_TO_RECEIVE, info.getTotalSizeToReceive());
+                            receivingSummaries.put(NetStatsHolder.TOTAL_FILES_RECEIVED, info.getTotalFilesReceived());
+                            receivingSummaries.put(NetStatsHolder.TOTAL_SIZE_RECEIVED, info.getTotalSizeReceived());
                         }
 
                         Integer progressId = 0;
-                        HashMap<Object, Object> prog = new HashMap<>();
-                        for (ProgressInfo progress : info.getSendingFiles())
-                        {
+                        Map<Object, Object> prog = new LinkedHashMap<>();
+                        for (ProgressInfo progress : info.getReceivingFiles())
                             prog.put(progressId++, progress.toString());
-                        }
-                        sendingSummaries.put("Progress", prog);
 
-                        sessionInfo.put("ReceivingSummaries", receivingSummaries);
+                        sendingSummaries.put(NetStatsHolder.PROGRESS, prog);
+
+                        sessionInfo.put(NetStatsHolder.RECEIVING_SUMMARIES, receivingSummaries);
                     }
 
 
@@ -111,44 +136,42 @@ public class NetStatsHolder implements StatsHolder
                     {
                         if (humanReadable)
                         {
-                            sendingSummaries.put("TotalFilesToSend", info.getTotalFilesToSend());
-                            sendingSummaries.put("TotalFileSizeToSend", FileUtils.stringifyFileSize(info.getTotalSizeToSend()));
-                            sendingSummaries.put("TotalFilesSent", info.getTotalFilesSent());
-                            sendingSummaries.put("TotalFileSizeSent", FileUtils.stringifyFileSize(info.getTotalSizeSent()));
+                            sendingSummaries.put(NetStatsHolder.TOTAL_FILES_TO_SEND, info.getTotalFilesToSend());
+                            sendingSummaries.put(NetStatsHolder.TOTAL_SIZE_TO_SEND, FileUtils.stringifyFileSize(info.getTotalSizeToSend()));
+                            sendingSummaries.put(NetStatsHolder.TOTAL_FILES_SENT, info.getTotalFilesSent());
+                            sendingSummaries.put(NetStatsHolder.TOTAL_SIZE_SENT, FileUtils.stringifyFileSize(info.getTotalSizeSent()));
                         }
                         else
                         {
-                            sendingSummaries.put("TotalFilesToSend", info.getTotalFilesToSend());
-                            sendingSummaries.put("TotalSizeToSend", info.getTotalSizeToSend());
-                            sendingSummaries.put("TotalFilesSent", info.getTotalFilesSent());
-                            sendingSummaries.put("TotalSizeSent", info.getTotalSizeSent());
+                            sendingSummaries.put(NetStatsHolder.TOTAL_FILES_TO_SEND, info.getTotalFilesToSend());
+                            sendingSummaries.put(NetStatsHolder.TOTAL_SIZE_TO_SEND, info.getTotalSizeToSend());
+                            sendingSummaries.put(NetStatsHolder.TOTAL_FILES_SENT, info.getTotalFilesSent());
+                            sendingSummaries.put(NetStatsHolder.TOTAL_SIZE_SENT, info.getTotalSizeSent());
                         }
 
                         Integer progressId = 0;
-                        HashMap<Object, Object> prog = new HashMap<>();
+                        Map<Object, Object> prog = new LinkedHashMap<>();
                         for (ProgressInfo progress : info.getSendingFiles())
-                        {
                             prog.put(progressId++, progress.toString());
-                        }
-                        sendingSummaries.put("Progress", prog);
 
-                        sessionInfo.put("SendingSummaries", sendingSummaries);
+                        sendingSummaries.put(NetStatsHolder.PROGRESS, prog);
+
+                        sessionInfo.put(NetStatsHolder.SENDING_SUMMARIES, sendingSummaries);
                     }
-
                 }
-                Statuses.put("PlanID", status.planId);
-                Statuses.put("Description", status.description);
-                Statuses.put("SessionInfo", sessionInfo);
+                Statuses.put(NetStatsHolder.PLAN_ID, status.planId.toString());
+                Statuses.put(NetStatsHolder.DESCRIPTION, status.description);
+                Statuses.put(NetStatsHolder.SESSION_INFO, sessionInfo);
             }
-            streamStatuses.put("Statuses", Statuses);
+            streamStatuses.put(NetStatsHolder.STATUSES, Statuses);
         }
-        result.put("StreamStatuses", streamStatuses);
+        result.put(NetStatsHolder.STREAM_STATUSES, streamStatuses);
 
-        HashMap<String, Object> readRepairStatistics = new HashMap<>();
-        readRepairStatistics.put("Attempted", probe.getReadRepairAttempted());
-        readRepairStatistics.put("BlockingMismatch", probe.getReadRepairRepairedBlocking());
-        readRepairStatistics.put("BackgroundMismatch", probe.getReadRepairRepairedBackground());
-        result.put("ReadRepairStatistics", readRepairStatistics);
+        Map<String, Object> readRepairStatistics = new LinkedHashMap<>();
+        readRepairStatistics.put(NetStatsHolder.ATTEMPTED, probe.getReadRepairAttempted());
+        readRepairStatistics.put(NetStatsHolder.BLOCKING_MISMATCH, probe.getReadRepairRepairedBlocking());
+        readRepairStatistics.put(NetStatsHolder.BACKGROUND_MISMATCH, probe.getReadRepairRepairedBackground());
+        result.put(NetStatsHolder.READ_REPAIR_STATICTICS, readRepairStatistics);
 
 
         MessagingServiceMBean ms = probe.msProxy;
@@ -165,12 +188,12 @@ public class NetStatsHolder implements StatsHolder
         dropped = 0;
         for (long n : ms.getLargeMessageDroppedTasks().values())
             dropped += n;
-        HashMap<String, Object> largeMessageService = new HashMap<>();
-        largeMessageService.put("Active", "n/a");
-        largeMessageService.put("Pending", pending);
-        largeMessageService.put("Completed", completed);
-        largeMessageService.put("Dropped", dropped);
-        messageServices.put("LargeMessages", largeMessageService);
+        Map<String, Object> largeMessageService = new LinkedHashMap<>();
+        largeMessageService.put(NetStatsHolder.ACTIVE, "n/a");
+        largeMessageService.put(NetStatsHolder.PENDING, pending);
+        largeMessageService.put(NetStatsHolder.COMPLETED, completed);
+        largeMessageService.put(NetStatsHolder.DROPPED, dropped);
+        messageServices.put(NetStatsHolder.LARGE_MESSAGES, largeMessageService);
 
         pending = 0;
         for (int n : ms.getSmallMessagePendingTasks().values())
@@ -181,13 +204,12 @@ public class NetStatsHolder implements StatsHolder
         dropped = 0;
         for (long n : ms.getSmallMessageDroppedTasks().values())
             dropped += n;
-        HashMap<String, Object> smallMessageService = new HashMap<>();
-        smallMessageService.put("Active", "n/a");
-        smallMessageService.put("Pending", pending);
-        smallMessageService.put("Completed", completed);
-        smallMessageService.put("Dropped", dropped);
-        messageServices.put("SmallMessages", smallMessageService);
-
+        Map<String, Object> smallMessageService = new LinkedHashMap<>();
+        smallMessageService.put(NetStatsHolder.ACTIVE, "n/a");
+        smallMessageService.put(NetStatsHolder.PENDING, pending);
+        smallMessageService.put(NetStatsHolder.COMPLETED, completed);
+        smallMessageService.put(NetStatsHolder.DROPPED, dropped);
+        messageServices.put(NetStatsHolder.SMALL_MESSAGES, smallMessageService);
 
         pending = 0;
         for (int n : ms.getGossipMessagePendingTasks().values())
@@ -198,15 +220,14 @@ public class NetStatsHolder implements StatsHolder
         dropped = 0;
         for (long n : ms.getGossipMessageDroppedTasks().values())
             dropped += n;
-        HashMap<String, Object> gossipMessageService = new HashMap<>();
-        gossipMessageService.put("Active", "n/a");
-        gossipMessageService.put("Pending", pending);
-        gossipMessageService.put("Completed", completed);
-        gossipMessageService.put("Dropped", dropped);
-        messageServices.put("GossipMessages", gossipMessageService);
+        Map<String, Object> gossipMessageService = new LinkedHashMap<>();
+        gossipMessageService.put(NetStatsHolder.ACTIVE, "n/a");
+        gossipMessageService.put(NetStatsHolder.PENDING, pending);
+        gossipMessageService.put(NetStatsHolder.COMPLETED, completed);
+        gossipMessageService.put(NetStatsHolder.DROPPED, dropped);
+        messageServices.put(NetStatsHolder.GOSSIP_MESSAGES, gossipMessageService);
 
-
-        result.put("MessageService", messageServices);
+        result.put(NetStatsHolder.MESSAGE_SERVICES, messageServices);
 
         return result;
     }
