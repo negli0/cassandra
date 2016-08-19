@@ -126,7 +126,7 @@ public class NetStatsHolder implements StatsHolder
                         for (ProgressInfo progress : info.getReceivingFiles())
                             prog.put(progressId++, progress.toString());
 
-                        sendingSummaries.put(NetStatsHolder.PROGRESS, prog);
+                        receivingSummaries.put(NetStatsHolder.PROGRESS, prog);
 
                         sessionInfo.put(NetStatsHolder.RECEIVING_SUMMARIES, receivingSummaries);
                     }
